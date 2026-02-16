@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useApp } from '../store/AppContext';
 import { ScheduleStatus, ScheduleItem } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import XLSX from 'xlsx';
+import *as XLSX from 'xlsx';
 import { Download, AlertCircle, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { parseLocal } from '../utils';
