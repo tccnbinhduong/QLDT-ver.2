@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#2563EB" />
+    <meta name="description" content="EduSchedule Pro - Ứng dụng quản lý đào tạo cá nhân" />
+    <title>EduSchedule Pro - Quản lý đào tạo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      /* Custom scrollbar for better UX */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #555;
+      }
+      @media print {
+        .no-print {
+          display: none;
+        }
+        .print-only {
+          display: block;
+        }
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "recharts": "https://esm.sh/recharts@^3.7.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "date-fns/": "https://esm.sh/date-fns@^4.1.0/",
+    "date-fns": "https://esm.sh/date-fns@^4.1.0",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "xlsx": "https://esm.sh/xlsx-js-style@1.2.0",
+    "exceljs": "https://esm.sh/exceljs@4.4.0",
+    "pizzip": "https://esm.sh/pizzip@3.1.4",
+    "docxtemplater": "https://esm.sh/docxtemplater@3.37.11",
+    "file-saver": "https://esm.sh/file-saver@2.0.5"
+  }
+}
+</script>
+</head>
+  <body class="bg-gray-50 text-gray-900">
+    <div id="root"></div>
+    <script type="module" src="./index.tsx"></script>
+  </body>
+</html>

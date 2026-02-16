@@ -1,0 +1,29 @@
+{
+  "name": "copy-qldt",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "recharts": "^3.7.0",
+    "lucide-react": "^0.563.0",
+    "react-dom": "^19.2.4",
+    "date-fns": "^4.1.0",
+    "react": "^19.2.4",
+    "xlsx": "1.2.0",
+    "exceljs": "4.4.0",
+    "pizzip": "3.1.4",
+    "docxtemplater": "3.37.11",
+    "file-saver": "2.0.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}
