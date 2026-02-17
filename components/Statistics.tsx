@@ -1,8 +1,9 @@
+
 import React, { useMemo, useState } from 'react';
 import { useApp } from '../store/AppContext';
 import { ScheduleStatus, ScheduleItem } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import *as XLSX from 'xlsx';
+import XLSX from 'xlsx';
 import { Download, AlertCircle, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { parseLocal } from '../utils';
@@ -94,8 +95,14 @@ const Statistics: React.FC = () => {
     const results: any[] = [];
     
     classes.forEach(cls => {
-        // Subjects for this class based on major
-        const classSubjects = subjects.filter(s => s.majorId === cls.majorId);
+        const isH8 = cls.name.toUpperCase().includes('H8');
+        
+        // Subjects for this class: Major specific OR Common OR Culture (if not H8)
+        const classSubjects = subjects.filter(s => {
+            if (s.majorId === 'common') return true;
+            if (s.majorId === 'culture') return !isH8;
+            return s.majorId === cls.majorId;
+        });
         
         classSubjects.forEach(sub => {
              const relevantSchedules = schedules.filter(sch => 

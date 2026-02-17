@@ -4,8 +4,8 @@ import { useApp } from '../store/AppContext';
 import { checkConflict, calculateSubjectProgress, getSessionFromPeriod, parseLocal, determineStatus, getSessionSequenceInfo, generateId, base64ToArrayBuffer } from '../utils';
 import { ScheduleItem, ScheduleStatus, Teacher } from '../types';
 import { format, addDays, isSameDay, getWeek } from 'date-fns';
-import { vi } from 'date-fns/locale/vi';
-import { Calendar as CalendarIcon, Plus, ChevronRight, ChevronLeft, AlertCircle, Save, Trash2, FileSpreadsheet, ListFilter, X, Copy, Clipboard, Users, Download, BookOpen, Mail, CalendarOff } from 'lucide-react';
+import { vi } from 'date-fns/locale';
+import { Calendar as CalendarIcon, Plus, ChevronRight, ChevronLeft, AlertCircle, Save, Trash2, ListFilter, X, Copy, Clipboard, Users, Download, BookOpen, Mail, CalendarOff } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
@@ -47,14 +47,14 @@ const ScheduleManager: React.FC = () => {
   const [formSubjectId, setFormSubjectId] = useState('');
   const [formType, setFormType] = useState<'class' | 'exam'>('class');
   const [formRoom, setFormRoom] = useState('');
-  const [formGroup, setFormGroup] = useState(''); // NEW: Practice Group
+  const [formGroup, setFormGroup] = useState(''); // Group
   const [formDate, setFormDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [formStartPeriod, setFormStartPeriod] = useState(1);
   const [formPeriodCount, setFormPeriodCount] = useState(3);
   const [formError, setFormError] = useState('');
   const [formNote, setFormNote] = useState(''); 
 
-  // NEW: State for Shared Class Selection
+  // Shared Class Selection
   const [selectedSharedClasses, setSelectedSharedClasses] = useState<string[]>([]);
 
   const getStartOfWeek = (date: Date) => {
@@ -80,18 +80,16 @@ const ScheduleManager: React.FC = () => {
     return schedules.filter(s => s.classId === selectedClassId);
   }, [schedules, selectedClassId]);
 
-  // Filter subjects based on the selected class's major AND completion status
+  // Filter subjects logic
   const availableSubjects = useMemo(() => {
     const currentClass = classes.find(c => c.id === selectedClassId);
     if (!currentClass) return subjects; 
     
-    // 1. Get completion data from LocalStorage (Manual & Paid)
     let manualCompleted: string[] = [];
     let paidCompleted: string[] = [];
     try {
         const manual = localStorage.getItem('manual_completed_subjects');
         if (manual) manualCompleted = JSON.parse(manual);
-
         const paid = localStorage.getItem('paid_completed_subjects');
         if (paid) paidCompleted = JSON.parse(paid);
     } catch (e) {
@@ -99,58 +97,50 @@ const ScheduleManager: React.FC = () => {
     }
 
     const currentType = editItem ? editItem.type : formType;
+    const isH8 = currentClass.name.toUpperCase().includes('H8');
 
     return subjects.filter(s => {
-        // Must match Major
-        if (s.majorId !== currentClass.majorId) return false;
+        let isEligible = false;
+        if (s.majorId === 'common') {
+            isEligible = true;
+        } else if (s.majorId === 'culture') {
+            isEligible = !isH8;
+        } else {
+            isEligible = s.majorId === currentClass.majorId;
+        }
 
-        // If we are Editing an item, ALWAYS show its current subject (even if completed)
-        // so the dropdown selects it correctly.
+        if (!isEligible) return false;
         if (editItem && editItem.subjectId === s.id) return true;
 
         const uniqueKey = `${s.id}-${currentClass.id}`;
-        
-        // Determine Finished Status
         const isManuallyFinished = manualCompleted.includes(uniqueKey) || paidCompleted.includes(uniqueKey);
-
         const relevantSchedules = schedules.filter(sch => 
             sch.subjectId === s.id && 
             sch.classId === currentClass.id && 
             sch.status !== ScheduleStatus.OFF
         );
-        
         const learned = relevantSchedules
             .filter(sch => sch.type === 'class')
             .reduce((acc, curr) => acc + curr.periodCount, 0);
-
         const isAutoFinished = learned >= s.totalPeriods;
         const isFinished = isManuallyFinished || isAutoFinished;
 
         if (currentType === 'exam') {
-             // Exam Logic:
-             // Hide if NOT Finished (Currently Learning/Upcoming)
              if (!isFinished) return false;
-             
-             // Hide if Already has Exam
              const hasExam = relevantSchedules.some(sch => sch.type === 'exam');
              if (hasExam) return false;
-             
              return true;
         } else {
-             // Class Logic:
-             // Hide if Finished
              if (isFinished) return false;
-             
              return true;
         }
     });
   }, [subjects, classes, selectedClassId, schedules, editItem, formType]);
 
-  // NEW: Calculate Active Subjects for the current class in CURRENT WEEK
+  // Active Subjects Summary
   const activeSubjectsSummary = useMemo(() => {
     const startOfWeek = weekStart;
     const endOfWeek = addDays(weekStart, 6);
-    
     const sStart = new Date(startOfWeek.getFullYear(), startOfWeek.getMonth(), startOfWeek.getDate());
     const sEnd = new Date(endOfWeek.getFullYear(), endOfWeek.getMonth(), endOfWeek.getDate());
 
@@ -162,7 +152,6 @@ const ScheduleManager: React.FC = () => {
     });
 
     const uniqueSubjectIds = Array.from(new Set(currentWeekSchedules.map(s => s.subjectId)));
-
     const newSubjectIds = uniqueSubjectIds.filter(subId => {
         const hasPriorSchedule = schedules.some(s => {
             if (s.subjectId !== subId || s.classId !== selectedClassId || s.status === ScheduleStatus.OFF) return false;
@@ -192,7 +181,7 @@ const ScheduleManager: React.FC = () => {
     });
   }, [schedules, subjects, teachers, classes, selectedClassId, weekStart]);
 
-  // NEW: Group teachers by recommendation
+  // Teacher Recommendation
   const currentSubjectId = editItem ? editItem.subjectId : formSubjectId;
   const { suggestedTeachers, otherTeachers } = useMemo(() => {
     const subj = subjects.find(s => s.id === currentSubjectId);
@@ -214,14 +203,24 @@ const ScheduleManager: React.FC = () => {
             others.push(t);
         }
     });
-    
     return { suggestedTeachers: suggested, otherTeachers: others };
   }, [currentSubjectId, teachers, subjects]);
 
-
-  // Check if current form subject is shared
   const currentFormSubject = subjects.find(s => s.id === currentSubjectId);
-  const isFormSubjectShared = !!currentFormSubject?.isShared;
+  
+  // Logic update: Shared if explicitly shared OR if it's a specific major subject (allowing same-major classes to join)
+  const isFormSubjectShared = useMemo(() => {
+      if (!currentFormSubject) return false;
+      if (currentFormSubject.isShared) return true;
+      
+      // Check if it is a specific major (not common/culture)
+      // And if there are other classes with the same major
+      if (currentFormSubject.majorId !== 'common' && currentFormSubject.majorId !== 'culture') {
+          return classes.some(c => c.id !== selectedClassId && c.majorId === currentFormSubject.majorId);
+      }
+      
+      return false;
+  }, [currentFormSubject, classes, selectedClassId]);
 
   // Initialize shared classes
   useEffect(() => {
@@ -231,6 +230,30 @@ const ScheduleManager: React.FC = () => {
         }
     }
   }, [showAddModal, formSubjectId, selectedClassId]);
+
+  // FILTER LOGIC:
+  // 1. If Culture -> Remove H8
+  // 2. If Major Specific -> Remove classes not in that major
+  useEffect(() => {
+      if (!currentFormSubject) return;
+
+      setSelectedSharedClasses(prev => prev.filter(id => {
+          if (id === selectedClassId) return true; // Always keep current
+          const cls = classes.find(c => c.id === id);
+          if (!cls) return false;
+
+          if (currentFormSubject.majorId === 'culture') {
+              return !cls.name.toUpperCase().includes('H8');
+          }
+          
+          if (currentFormSubject.majorId !== 'common') {
+              // Strict Major matching
+              return cls.majorId === currentFormSubject.majorId;
+          }
+
+          return true; // Common subjects keep everyone
+      }));
+  }, [formSubjectId, classes, selectedClassId, currentFormSubject]);
 
   useEffect(() => {
     const handleClick = () => setContextMenu({ ...contextMenu, show: false });
@@ -264,7 +287,10 @@ const ScheduleManager: React.FC = () => {
 
   const getRelatedSharedItems = (sourceItem: ScheduleItem) => {
     const subject = subjects.find(s => s.id === sourceItem.subjectId);
-    if (!subject?.isShared) return [sourceItem];
+    // Modified: Check implicit shared based on logic
+    const isShared = subject?.isShared || (subject && subject.majorId !== 'common' && subject.majorId !== 'culture');
+    
+    if (!isShared) return [sourceItem];
     return schedules.filter(s => 
         s.subjectId === sourceItem.subjectId &&
         s.teacherId === sourceItem.teacherId &&
@@ -286,7 +312,6 @@ const ScheduleManager: React.FC = () => {
     return latest.teacherId;
   };
 
-  // Drag and Drop Handlers
   const handleDragStart = (e: React.DragEvent, item: ScheduleItem) => {
     setDraggedItem(item);
     e.dataTransfer.effectAllowed = "copy";
@@ -301,7 +326,6 @@ const ScheduleManager: React.FC = () => {
     e.preventDefault();
     if (!draggedItem) return;
 
-    // Check Holiday
     const holiday = getHoliday(targetDate);
     if (holiday) {
         alert(`Không thể xếp lịch vào ngày nghỉ: ${holiday.name}`);
@@ -310,7 +334,6 @@ const ScheduleManager: React.FC = () => {
     }
 
     const targetDateStr = format(targetDate, 'yyyy-MM-dd');
-
     if (draggedItem.date === targetDateStr && draggedItem.startPeriod === targetPeriod) {
         setDraggedItem(null);
         return;
@@ -351,10 +374,7 @@ const ScheduleManager: React.FC = () => {
 
   const handleContextMenu = (e: React.MouseEvent, date: Date, period: number, item?: ScheduleItem) => {
     e.preventDefault();
-    
-    // Disable context menu on holidays
     if (getHoliday(date)) return;
-
     setContextMenu({
       show: true,
       x: e.pageX,
@@ -373,7 +393,6 @@ const ScheduleManager: React.FC = () => {
   const handlePaste = () => {
     if (!copiedItem || !contextMenu.target) return;
 
-    // Check Holiday
     const holiday = getHoliday(contextMenu.target.date);
     if (holiday) {
         alert(`Không thể dán lịch vào ngày nghỉ: ${holiday.name}`);
@@ -465,7 +484,6 @@ const ScheduleManager: React.FC = () => {
       return;
     }
 
-    // Check Holiday
     const holiday = getHoliday(parseLocal(date));
     if (holiday) {
          setFormError(`Ngày ${format(parseLocal(date), 'dd/MM/yyyy')} là ngày nghỉ: ${holiday.name}`);
@@ -547,7 +565,10 @@ const ScheduleManager: React.FC = () => {
       const slotKey = `${item.date}-${item.startPeriod}-${item.teacherId}-${item.subjectId}`;
       let itemsToProcess = [item];
 
-      if (subject.isShared) {
+      // Logic updated: use the same check as getRelatedSharedItems
+      const isShared = subject.isShared || (subject.majorId !== 'common' && subject.majorId !== 'culture');
+
+      if (isShared) {
           if (processedSharedKeys.has(slotKey)) return; 
           const sharedGroup = getRelatedSharedItems(item);
           if (sharedGroup.length > 0) {
@@ -566,7 +587,6 @@ const ScheduleManager: React.FC = () => {
             const nextDate = addDays(parseLocal(sourceItem.date), 7);
             const newDateStr = format(nextDate, 'yyyy-MM-dd');
             
-            // Check Holiday for next week
             const holiday = getHoliday(nextDate);
             if (holiday) {
                 const className = classes.find(c => c.id === sourceItem.classId)?.name;
@@ -676,7 +696,6 @@ const ScheduleManager: React.FC = () => {
         const dateStr = format(day, 'yyyy-MM-dd');
         const colIndex = dayIndex + 3;
         
-        // Check holiday
         const holiday = getHoliday(day);
 
         for (let p = 1; p <= 10; p++) {
@@ -686,8 +705,8 @@ const ScheduleManager: React.FC = () => {
             cell.alignment = { vertical: 'middle', wrapText: true, horizontal: 'left' }; 
 
             if (holiday) {
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEEEEE' } }; // Light Gray
-                if (p === 1) { // Add text only once visually, maybe across merged cells if we wanted, but simple text is fine
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEEEEE' } }; 
+                if (p === 1) { 
                     cell.value = `NGHỈ: ${holiday.name.toUpperCase()}`;
                     cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
                     cell.font = { bold: true, color: { argb: 'FF888888' } };
@@ -750,7 +769,6 @@ const ScheduleManager: React.FC = () => {
     saveAs(blob, `Lich_Hoc_${currentClass.name}_Tuan_${weekNumber}.xlsx`);
   };
 
-  // ... (Export Invitation Function Remains Same) ...
   const handleExportInvitation = (item: any) => {
       const template = templates.find(t => t.type === 'invitation_word');
       if (!template) {
@@ -1194,7 +1212,22 @@ const ScheduleManager: React.FC = () => {
                         <Users size={16} className="mr-2"/> Chọn các lớp học ghép (Môn chung)
                     </label>
                     <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
-                        {classes.map(cls => (
+                        {classes.filter(cls => {
+                            if (!currentFormSubject) return false;
+
+                            // 1. Culture: Exclude H8
+                            if (currentFormSubject.majorId === 'culture') {
+                                return !cls.name.toUpperCase().includes('H8');
+                            }
+                            
+                            // 2. Common: Include All
+                            if (currentFormSubject.majorId === 'common') {
+                                return true;
+                            }
+
+                            // 3. Specific Major: Only include classes with same major
+                            return cls.majorId === currentFormSubject.majorId;
+                        }).map(cls => (
                             <label key={cls.id} className={`flex items-center space-x-2 text-sm p-2 rounded cursor-pointer ${selectedSharedClasses.includes(cls.id) ? 'bg-blue-100' : 'hover:bg-white'}`}>
                                 <input
                                     type="checkbox"

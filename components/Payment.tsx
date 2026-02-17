@@ -1,7 +1,8 @@
+
 import React, { useMemo, useState } from 'react';
 import { useApp } from '../store/AppContext';
 import { ScheduleStatus } from '../types';
-import *as XLSX from 'xlsx';
+import XLSX from 'xlsx';
 import ExcelJS from 'exceljs'; // Import ExcelJS
 import saveAs from 'file-saver';
 import { Download, Trash2, CheckCircle, CreditCard, FileSpreadsheet } from 'lucide-react';
@@ -27,7 +28,14 @@ const Payment: React.FC = () => {
     const results: any[] = [];
     
     classes.forEach(cls => {
-        const classSubjects = subjects.filter(s => s.majorId === cls.majorId);
+        const isH8 = cls.name.toUpperCase().includes('H8');
+
+        // Subjects for this class: Major specific OR Common OR Culture (if not H8)
+        const classSubjects = subjects.filter(s => {
+            if (s.majorId === 'common') return true;
+            if (s.majorId === 'culture') return !isH8;
+            return s.majorId === cls.majorId;
+        });
         
         classSubjects.forEach(sub => {
             // Unique key for payment tracking

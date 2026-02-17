@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import { useApp } from '../store/AppContext';
 import { Teacher, Subject, ClassEntity } from '../types';
 import { Plus, Trash2, Edit2, Save, X, Filter, Search, Phone, Upload, HelpCircle, Users, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
-import *as XLSX from 'xlsx';
+import XLSX from 'xlsx';
 
 const Management: React.FC = () => {
   const { 
@@ -587,10 +587,15 @@ const Management: React.FC = () => {
                   </div>
                </div>
 
+                <datalist id="teacher-list">
+                    {teachers.map(t => <option key={t.id} value={t.name} />)}
+                </datalist>
+
                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4 items-end">
                   <div className="space-y-1">
                      <p className="text-sm font-bold text-gray-600">Giáo viên phụ trách 1</p>
-                     <select
+                     <input
+                        list="teacher-list"
                         className="border p-2 rounded w-full text-sm"
                         value={newSubject.teacher1 || ''}
                         onChange={(e) => {
@@ -602,17 +607,14 @@ const Management: React.FC = () => {
                                 phone1: teacher ? teacher.phone : ''
                             });
                         }}
-                     >
-                        <option value="">-- Chọn giáo viên --</option>
-                        {teachers.map(t => (
-                            <option key={t.id} value={t.name}>{t.name}</option>
-                        ))}
-                     </select>
+                        placeholder="Nhập tên hoặc chọn..."
+                     />
                   </div>
                   <div className="space-y-1">
                      <p className="text-sm font-bold text-gray-600">Giáo viên phụ trách 2</p>
                      <div className="flex items-center gap-2">
-                        <select
+                        <input
+                            list="teacher-list"
                             className="border p-2 rounded w-full text-sm"
                             value={newSubject.teacher2 || ''}
                             onChange={(e) => {
@@ -624,12 +626,8 @@ const Management: React.FC = () => {
                                     phone2: teacher ? teacher.phone : ''
                                 });
                             }}
-                        >
-                            <option value="">-- Chọn giáo viên --</option>
-                            {teachers.map(t => (
-                                <option key={t.id} value={t.name}>{t.name}</option>
-                            ))}
-                        </select>
+                            placeholder="Nhập tên hoặc chọn..."
+                        />
                         <div className="flex gap-2">
                              {editingSubjectId && (
                                <button onClick={handleCancelSubject} className="bg-gray-300 text-gray-700 p-2 rounded px-3 text-sm whitespace-nowrap h-[38px]">Hủy</button>

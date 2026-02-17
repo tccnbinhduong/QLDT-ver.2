@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Teacher, Subject, ClassEntity, ScheduleItem, Major, ScheduleStatus, Student, AppState, DocumentItem, ExportTemplate, Holiday } from '../types';
 import { generateId } from '../utils';
@@ -48,6 +47,13 @@ const INITIAL_DATA: AppState = {
     { id: '3', name: 'Nguyên lý kế toán', majorId: '1', totalPeriods: 60 },
     { id: '4', name: 'Khí cụ điện', majorId: '2', totalPeriods: 45 },
     { id: '5', name: 'Mạch điện tử', majorId: '3', totalPeriods: 60 },
+    // Môn chung
+    { id: '6', name: 'Giáo dục chính trị', majorId: 'common', totalPeriods: 30, isShared: true },
+    { id: '7', name: 'Tiếng Anh cơ bản', majorId: 'common', totalPeriods: 45, isShared: true },
+    { id: '8', name: 'Giáo dục thể chất', majorId: 'common', totalPeriods: 30, isShared: true },
+    // Môn văn hóa
+    { id: '9', name: 'Toán 10', majorId: 'culture', totalPeriods: 45, isShared: true },
+    { id: '10', name: 'Ngữ văn 10', majorId: 'culture', totalPeriods: 45, isShared: true },
   ],
   classes: [
     { id: '1', name: 'Điện Công Nghiệp (25DC2H8)', studentCount: 40, majorId: '2', schoolYear: '2023-2026' },
@@ -58,6 +64,8 @@ const INITIAL_DATA: AppState = {
     { id: '2', studentCode: 'SV002', classId: '1', name: 'Trần Thị B', dob: '2005-05-20', pob: 'Nam Định', fatherName: 'Trần Văn D', motherName: 'Phạm Thị E', phone: '0912345678', status: 'studying' },
   ],
   majors: [
+    { id: 'common', name: 'Môn chung' },
+    { id: 'culture', name: 'Văn hóa' },
     { id: '1', name: 'Kế toán Doanh nghiệp' },
     { id: '2', name: 'Điện công nghiệp' },
     { id: '3', name: 'Điện - điện tử' },

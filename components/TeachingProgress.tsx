@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../store/AppContext';
 import { ScheduleStatus } from '../types';
@@ -111,9 +112,16 @@ const TeachingProgress: React.FC = () => {
   // Calculate progress for all subjects in the selected class
   const progressData = useMemo(() => {
     if (!currentClass) return [];
+    
+    const isH8 = currentClass.name.toUpperCase().includes('H8');
 
-    // 1. Get subjects for this class's major
-    const classSubjects = subjects.filter(s => s.majorId === currentClass.majorId);
+    // 1. Filter relevant subjects
+    // Includes: Major specific, Common, and Culture (unless H8)
+    const classSubjects = subjects.filter(s => {
+        if (s.majorId === 'common') return true;
+        if (s.majorId === 'culture') return !isH8;
+        return s.majorId === currentClass.majorId;
+    });
 
     // 2. Calculate stats per subject
     return classSubjects.map(sub => {
@@ -423,7 +431,7 @@ const TeachingProgress: React.FC = () => {
 
              {progressData.length === 0 && (
                 <div className="p-8 text-center text-gray-400 italic">
-                    Chưa có môn học nào thuộc ngành của lớp này.
+                    Chưa có môn học nào thuộc ngành của lớp này (hoặc lớp thuộc hệ H8 không có môn văn hóa).
                 </div>
              )}
           </div>
