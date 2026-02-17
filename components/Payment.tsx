@@ -2,12 +2,12 @@
 import React, { useMemo, useState } from 'react';
 import { useApp } from '../store/AppContext';
 import { ScheduleStatus } from '../types';
-import *as XLSX from 'xlsx';
+import XLSX from 'xlsx';
 import ExcelJS from 'exceljs'; // Import ExcelJS
 import saveAs from 'file-saver';
 import { Download, Trash2, CheckCircle, CreditCard, FileSpreadsheet } from 'lucide-react';
 import { format } from 'date-fns';
-import { parseLocal, base64ToArrayBuffer } from '../utils';
+import { parseLocal, base64ToArrayBuffer, isSubjectFinished } from '../utils';
 
 const Payment: React.FC = () => {
   const { teachers, schedules, subjects, classes, templates } = useApp();
@@ -44,16 +44,14 @@ const Payment: React.FC = () => {
             // Skip if already paid/deleted
             if (paidItems.includes(uniqueKey)) return;
 
-             const relevantSchedules = schedules.filter(sch => 
-                sch.subjectId === sub.id && 
-                sch.classId === cls.id && 
-                sch.status !== ScheduleStatus.OFF
-            );
-            
-            const learned = relevantSchedules.reduce((acc, curr) => acc + curr.periodCount, 0);
-            
-            // Condition: Learned >= Total AND started (learned > 0)
-            if (learned >= sub.totalPeriods && learned > 0) {
+            // USE SHARED HELPER
+            if (isSubjectFinished(sub, cls.id, schedules)) {
+                 const relevantSchedules = schedules.filter(sch => 
+                    sch.subjectId === sub.id && 
+                    sch.classId === cls.id && 
+                    sch.status !== ScheduleStatus.OFF
+                );
+                
                  // Get list of teachers who taught this subject for this class
                  const teacherIds = Array.from(new Set(relevantSchedules.map(s => s.teacherId)));
                  const teacherNames = teacherIds.map(tid => teachers.find(t => t.id === tid)?.name || 'GV đã xóa').join(', ');

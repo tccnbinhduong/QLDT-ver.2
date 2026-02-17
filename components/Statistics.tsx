@@ -3,10 +3,10 @@ import React, { useMemo, useState } from 'react';
 import { useApp } from '../store/AppContext';
 import { ScheduleStatus, ScheduleItem } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import *as XLSX from 'xlsx';
+import XLSX from 'xlsx';
 import { Download, AlertCircle, X } from 'lucide-react';
 import { format } from 'date-fns';
-import { parseLocal } from '../utils';
+import { parseLocal, isSubjectFinished } from '../utils';
 
 const Statistics: React.FC = () => {
   const { teachers, schedules, subjects, classes } = useApp();
@@ -17,27 +17,10 @@ const Statistics: React.FC = () => {
   const missedClasses = useMemo(() => {
     const missedMap: Record<string, ScheduleItem[]> = {};
     const makeupMap: Record<string, number> = {};
-    const completionCache: Record<string, boolean> = {};
-
-    // Helper to check if subject is completed
-    const isSubjectFinished = (subId: string, clsId: string) => {
-        const key = `${subId}-${clsId}`;
-        if (completionCache[key] !== undefined) return completionCache[key];
-
-        const subject = subjects.find(s => s.id === subId);
-        if (!subject) return false;
-
-        const learned = schedules.filter(s => 
-            s.subjectId === subId && 
-            s.classId === clsId && 
-            s.status !== ScheduleStatus.OFF
-        ).reduce((acc, curr) => acc + curr.periodCount, 0);
-
-        const finished = learned >= subject.totalPeriods;
-        completionCache[key] = finished;
-        return finished;
-    };
-
+    
+    // Use simple check or global helper. Using global helper is better.
+    // However, global helper requires iterating.
+    
     // Group items
     schedules.forEach(s => {
         const key = `${s.subjectId}-${s.classId}`;
@@ -55,8 +38,11 @@ const Statistics: React.FC = () => {
     Object.keys(missedMap).forEach(key => {
         const [subId, clsId] = key.split('-');
         
-        // 1. If subject completed -> No alert
-        if (isSubjectFinished(subId, clsId)) return;
+        const subject = subjects.find(s => s.id === subId);
+        if (!subject) return;
+
+        // 1. If subject completed (use shared helper) -> No alert
+        if (isSubjectFinished(subject, clsId, schedules)) return;
 
         // 2. If has makeup sessions -> Reduce alerts
         // We assume makeup sessions cover the earliest missed classes first

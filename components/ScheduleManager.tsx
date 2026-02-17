@@ -4,7 +4,7 @@ import { useApp } from '../store/AppContext';
 import { checkConflict, calculateSubjectProgress, getSessionFromPeriod, parseLocal, determineStatus, getSessionSequenceInfo, generateId, base64ToArrayBuffer } from '../utils';
 import { ScheduleItem, ScheduleStatus, Teacher } from '../types';
 import { format, addDays, isSameDay, getWeek } from 'date-fns';
-import { vi } from 'date-fns/locale/vi';
+import { vi } from 'date-fns/locale';
 import { Calendar as CalendarIcon, Plus, ChevronRight, ChevronLeft, AlertCircle, Save, Trash2, ListFilter, X, Copy, Clipboard, Users, Download, BookOpen, Mail, CalendarOff } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import PizZip from 'pizzip';
@@ -547,9 +547,13 @@ const ScheduleManager: React.FC = () => {
                 }
             }
 
+            // Get IDs of all items in the group to exclude from conflict check
+            const relatedIds = relatedItems.map(i => i.id);
+
             for (const item of relatedItems) {
                  const itemToCheck = { ...baseItem, classId: item.classId };
-                 const conflict = checkConflict(itemToCheck, schedules, subjects, item.id);
+                 // Pass all related IDs to exclude from conflict checking (safe update for shared group)
+                 const conflict = checkConflict(itemToCheck, schedules, subjects, relatedIds);
                  if (conflict.hasConflict) {
                      const className = classes.find(c => c.id === item.classId)?.name;
                      setFormError(`Lớp ${className}: ${conflict.message}`);

@@ -1,9 +1,10 @@
+
 import React, { useEffect, useState, useMemo } from 'react';
 import { useApp } from '../store/AppContext';
 import { BookOpen, Users, Calendar, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
-import { vi } from 'date-fns/locale/vi';
-import { parseLocal, determineStatus } from '../utils';
+import { vi } from 'date-fns/locale';
+import { parseLocal, determineStatus, isSubjectFinished } from '../utils';
 import { ScheduleStatus } from '../types';
 
 const Dashboard: React.FC = () => {
@@ -55,16 +56,14 @@ const Dashboard: React.FC = () => {
             // Skip if hidden/deleted
             if (paidItems.includes(uniqueKey)) return;
 
-             const relevantSchedules = schedules.filter(sch => 
-                sch.subjectId === sub.id && 
-                sch.classId === cls.id && 
-                sch.status !== ScheduleStatus.OFF
-            );
-            
-            const learned = relevantSchedules.reduce((acc, curr) => acc + curr.periodCount, 0);
-            
-            // Condition: Learned >= Total AND started (learned > 0)
-            if (learned >= sub.totalPeriods && learned > 0) {
+            // USE SHARED HELPER
+            if (isSubjectFinished(sub, cls.id, schedules)) {
+                 const relevantSchedules = schedules.filter(sch => 
+                    sch.subjectId === sub.id && 
+                    sch.classId === cls.id && 
+                    sch.status !== ScheduleStatus.OFF
+                );
+
                  const teacherIds = Array.from(new Set(relevantSchedules.map(s => s.teacherId)));
                  const teacherNames = teacherIds.map(tid => teachers.find(t => t.id === tid)?.name || 'GV đã xóa').join(', ');
 

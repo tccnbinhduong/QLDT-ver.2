@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import { useApp } from '../store/AppContext';
 import { Teacher, Subject, ClassEntity } from '../types';
 import { Plus, Trash2, Edit2, Save, X, Filter, Search, Phone, Upload, HelpCircle, Users, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
-import *as XLSX from 'xlsx';
+import XLSX from 'xlsx';
 
 const Management: React.FC = () => {
   const { 

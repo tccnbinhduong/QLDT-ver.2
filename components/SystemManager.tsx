@@ -1,3 +1,4 @@
+
 import React, { useRef } from 'react';
 import { useApp } from '../store/AppContext';
 import { AppState } from '../types';
@@ -15,15 +16,32 @@ const SystemManager: React.FC = () => {
   const templateStudentInputRef = useRef<HTMLInputElement>(null);
   const templateInvitationInputRef = useRef<HTMLInputElement>(null);
 
-  // Backup Handler
+  // Backup Handler (Enhanced to include metadata)
   const handleBackup = () => {
-      const data: AppState = { teachers, subjects, majors, classes, schedules, students, documents, templates, holidays };
-      const json = JSON.stringify(data, null, 2);
+      // 1. Core State
+      const coreData: AppState = { teachers, subjects, majors, classes, schedules, students, documents, templates, holidays };
+      
+      // 2. Metadata (Local Storage side-data)
+      const metaData = {
+          progress: JSON.parse(localStorage.getItem('subject_progress_metadata') || '{}'),
+          paid: JSON.parse(localStorage.getItem('paid_completed_subjects') || '[]'),
+          manual: JSON.parse(localStorage.getItem('manual_completed_subjects') || '[]')
+      };
+
+      const backupPackage = {
+          version: "1.1",
+          type: "full_backup",
+          timestamp: new Date().toISOString(),
+          data: coreData,
+          meta: metaData
+      };
+
+      const json = JSON.stringify(backupPackage, null, 2);
       const blob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `EduPro_Backup_${format(new Date(), 'dd-MM-yyyy')}.json`;
+      link.download = `EduPro_FullBackup_${format(new Date(), 'dd-MM-yyyy')}.json`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -41,10 +59,28 @@ const SystemManager: React.FC = () => {
       reader.onload = (evt) => {
           try {
               const json = evt.target?.result as string;
-              const data = JSON.parse(json) as AppState;
-              loadData(data);
-              alert("Khôi phục dữ liệu thành công!");
+              const parsed = JSON.parse(json);
+
+              // Check if it's new format (v1.1+) or old format
+              if (parsed.type === "full_backup" && parsed.data) {
+                  // New Format: Restore Core Data
+                  loadData(parsed.data);
+                  
+                  // Restore Metadata
+                  if (parsed.meta) {
+                      if (parsed.meta.progress) localStorage.setItem('subject_progress_metadata', JSON.stringify(parsed.meta.progress));
+                      if (parsed.meta.paid) localStorage.setItem('paid_completed_subjects', JSON.stringify(parsed.meta.paid));
+                      if (parsed.meta.manual) localStorage.setItem('manual_completed_subjects', JSON.stringify(parsed.meta.manual));
+                  }
+                  
+                  alert("Khôi phục toàn bộ dữ liệu hệ thống thành công!");
+              } else {
+                  // Legacy Format (Just AppState)
+                  loadData(parsed as AppState);
+                  alert("Khôi phục dữ liệu cũ thành công (Lưu ý: Dữ liệu tiến độ thủ công không có trong bản sao lưu này).");
+              }
           } catch (error) {
+              console.error(error);
               alert("Lỗi: File dữ liệu không hợp lệ.");
           }
           if (fileInputRef.current) fileInputRef.current.value = '';

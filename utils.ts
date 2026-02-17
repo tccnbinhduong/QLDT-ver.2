@@ -1,3 +1,4 @@
+
 import { ScheduleItem, ScheduleStatus, Subject } from './types';
 import { isSameDay } from 'date-fns';
 
@@ -41,7 +42,7 @@ export const checkConflict = (
   newItem: Omit<ScheduleItem, 'id' | 'status'>,
   existingItems: ScheduleItem[],
   subjects: Subject[], // NEW: Pass subjects list to check for isShared
-  excludeId?: string
+  excludeIds?: string | string[] // Modified to support array
 ): { hasConflict: boolean; message: string } => {
   const newItemEnd = newItem.startPeriod + newItem.periodCount;
   
@@ -49,8 +50,10 @@ export const checkConflict = (
   const currentSubject = subjects.find(s => s.id === newItem.subjectId);
   const isNewItemShared = !!currentSubject?.isShared;
 
+  const excluded = Array.isArray(excludeIds) ? excludeIds : (excludeIds ? [excludeIds] : []);
+
   for (const item of existingItems) {
-    if (excludeId && item.id === excludeId) continue;
+    if (excluded.includes(item.id)) continue;
     if (item.status === ScheduleStatus.OFF) continue; // Ignored cancelled classes
 
     if (isSameDay(parseLocal(item.date), parseLocal(newItem.date))) {
@@ -214,4 +217,40 @@ export const determineStatus = (dateStr: string, startPeriod: number, currentSta
 
   // If dates are equal
   return ScheduleStatus.ONGOING;
+};
+
+// NEW: Global unified check for subject completion
+export const isSubjectFinished = (
+  subject: Subject,
+  classId: string,
+  schedules: ScheduleItem[]
+): boolean => {
+    const uniqueKey = `${subject.id}-${classId}`;
+    
+    // 1. Metadata (Teaching Progress Override)
+    try {
+        const metaJson = localStorage.getItem('subject_progress_metadata');
+        if (metaJson) {
+            const meta = JSON.parse(metaJson);
+            const data = meta[uniqueKey];
+            if (data?.statusOverride === 'completed') return true;
+            if (data?.statusOverride === 'in-progress') return false; 
+        }
+    } catch (e) { console.error(e) }
+
+    // 2. Legacy Manual & Paid Checks (Optional fallback)
+    try {
+        const paid = JSON.parse(localStorage.getItem('paid_completed_subjects') || '[]');
+        if (paid.includes(uniqueKey)) return true;
+        const manual = JSON.parse(localStorage.getItem('manual_completed_subjects') || '[]');
+        if (manual.includes(uniqueKey)) return true;
+    } catch (e) { console.error(e) }
+
+    // 3. Auto Calculation (Based on Period Count)
+    const learned = schedules
+        .filter(s => s.subjectId === subject.id && s.classId === classId && s.status !== ScheduleStatus.OFF)
+        .reduce((acc, curr) => acc + curr.periodCount, 0);
+        
+    // Must have started (learned > 0) AND reached total
+    return learned >= subject.totalPeriods && learned > 0;
 };
