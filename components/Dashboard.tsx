@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useApp } from '../store/AppContext';
 import { BookOpen, Users, Calendar, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
-import { vi } from 'date-fns/locale/vi';
+import { vi } from 'date-fns/locale';
 import { parseLocal, determineStatus } from '../utils';
 import { ScheduleStatus } from '../types';
 

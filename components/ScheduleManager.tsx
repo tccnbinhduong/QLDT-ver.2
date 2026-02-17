@@ -4,7 +4,7 @@ import { useApp } from '../store/AppContext';
 import { checkConflict, calculateSubjectProgress, getSessionFromPeriod, parseLocal, determineStatus, getSessionSequenceInfo, generateId, base64ToArrayBuffer } from '../utils';
 import { ScheduleItem, ScheduleStatus, Teacher } from '../types';
 import { format, addDays, isSameDay, getWeek } from 'date-fns';
-import { vi } from 'date-fns/locale/vi';
+import { vi } from 'date-fns/locale';
 import { Calendar as CalendarIcon, Plus, ChevronRight, ChevronLeft, AlertCircle, Save, Trash2, ListFilter, X, Copy, Clipboard, Users, Download, BookOpen, Mail, CalendarOff } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import PizZip from 'pizzip';
@@ -87,11 +87,15 @@ const ScheduleManager: React.FC = () => {
     
     let manualCompleted: string[] = [];
     let paidCompleted: string[] = [];
+    let progressMetadata: Record<string, any> = {};
+
     try {
         const manual = localStorage.getItem('manual_completed_subjects');
         if (manual) manualCompleted = JSON.parse(manual);
         const paid = localStorage.getItem('paid_completed_subjects');
         if (paid) paidCompleted = JSON.parse(paid);
+        const meta = localStorage.getItem('subject_progress_metadata');
+        if (meta) progressMetadata = JSON.parse(meta);
     } catch (e) {
         console.error(e);
     }
@@ -113,7 +117,11 @@ const ScheduleManager: React.FC = () => {
         if (editItem && editItem.subjectId === s.id) return true;
 
         const uniqueKey = `${s.id}-${currentClass.id}`;
-        const isManuallyFinished = manualCompleted.includes(uniqueKey) || paidCompleted.includes(uniqueKey);
+        
+        // Check for legacy manual/paid completion
+        const isLegacyFinished = manualCompleted.includes(uniqueKey) || paidCompleted.includes(uniqueKey);
+        
+        // Check for auto completion
         const relevantSchedules = schedules.filter(sch => 
             sch.subjectId === s.id && 
             sch.classId === currentClass.id && 
@@ -123,14 +131,24 @@ const ScheduleManager: React.FC = () => {
             .filter(sch => sch.type === 'class')
             .reduce((acc, curr) => acc + curr.periodCount, 0);
         const isAutoFinished = learned >= s.totalPeriods;
-        const isFinished = isManuallyFinished || isAutoFinished;
+        
+        // Check for new TeachingProgress metadata completion
+        const metadata = progressMetadata[uniqueKey];
+        const isMetadataFinished = metadata?.statusOverride === 'completed';
+
+        const isFinished = isLegacyFinished || isAutoFinished || isMetadataFinished;
 
         if (currentType === 'exam') {
+             // For Exam: Show if subject is Finished
              if (!isFinished) return false;
+             
+             // Optional: Hide if exam already exists (unless editing current item)
              const hasExam = relevantSchedules.some(sch => sch.type === 'exam');
-             if (hasExam) return false;
+             if (hasExam && (!editItem || editItem.subjectId !== s.id)) return false;
+             
              return true;
         } else {
+             // For Class: Hide if subject is Finished
              if (isFinished) return false;
              return true;
         }
@@ -508,6 +526,27 @@ const ScheduleManager: React.FC = () => {
         const originalItem = schedules.find(s => s.id === editItem.id);
         if (originalItem) {
             const relatedItems = getRelatedSharedItems(originalItem);
+            
+            // CONFIRMATION FOR SHARED CLASSES
+            if (relatedItems.length > 1) {
+                const isTeacherChanged = editItem.teacherId !== originalItem.teacherId;
+                const isRoomChanged = editItem.roomId !== originalItem.roomId;
+                const isTimeChanged = editItem.startPeriod !== originalItem.startPeriod || editItem.date !== originalItem.date;
+
+                if (isTeacherChanged || isRoomChanged || isTimeChanged) {
+                     const classNames = relatedItems.map(i => classes.find(c => c.id === i.classId)?.name).join(', ');
+                     let msg = `Đây là lịch học ghép của ${relatedItems.length} lớp:\n${classNames}\n\n`;
+                     
+                     if (isTeacherChanged) msg += `- Thay đổi GIÁO VIÊN sẽ áp dụng cho tất cả các lớp.\n`;
+                     if (isRoomChanged) msg += `- Thay đổi PHÒNG HỌC sẽ áp dụng cho tất cả các lớp.\n`;
+                     if (isTimeChanged) msg += `- Thay đổi THỜI GIAN sẽ áp dụng cho tất cả các lớp.\n`;
+                     
+                     msg += `\nBạn có chắc chắn muốn cập nhật?`;
+
+                     if (!window.confirm(msg)) return;
+                }
+            }
+
             for (const item of relatedItems) {
                  const itemToCheck = { ...baseItem, classId: item.classId };
                  const conflict = checkConflict(itemToCheck, schedules, subjects, item.id);
