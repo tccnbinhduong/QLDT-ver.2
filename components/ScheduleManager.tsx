@@ -4,7 +4,7 @@ import { useApp } from '../store/AppContext';
 import { checkConflict, calculateSubjectProgress, getSessionFromPeriod, parseLocal, determineStatus, getSessionSequenceInfo, generateId, base64ToArrayBuffer } from '../utils';
 import { ScheduleItem, ScheduleStatus, Teacher } from '../types';
 import { format, addDays, isSameDay, getWeek } from 'date-fns';
-import { vi } from 'date-fns/locale/vi';
+import { vi } from 'date-fns/locale';
 import { Calendar as CalendarIcon, Plus, ChevronRight, ChevronLeft, AlertCircle, Save, Trash2, ListFilter, X, Copy, Clipboard, Users, Download, BookOpen, Mail, CalendarOff } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import PizZip from 'pizzip';
@@ -1213,6 +1213,8 @@ const ScheduleManager: React.FC = () => {
                     value={editItem ? editItem.subjectId : formSubjectId} 
                     onChange={(e) => {
                         const val = e.target.value;
+                        const clsId = editItem ? editItem.classId : selectedClassId;
+                        const isExam = editItem ? editItem.type === 'exam' : formType === 'exam';
                         
                         // Auto-detect teacher
                         let autoTeacherId = '';
@@ -1227,11 +1229,43 @@ const ScheduleManager: React.FC = () => {
                              }
                         }
                         
-                        const isExam = editItem ? editItem.type === 'exam' : formType === 'exam';
-                        const clsId = editItem ? editItem.classId : selectedClassId;
                         if (isExam && val) {
                             const historyTeacher = getTeacherForSubject(val, clsId);
                             if (historyTeacher) autoTeacherId = historyTeacher;
+                        }
+
+                        // NEW: Calculate remaining periods to auto-adjust for the last session
+                        if (val && !isExam) {
+                            const subject = subjects.find(s => s.id === val);
+                            if (subject) {
+                                const used = schedules.filter(s =>
+                                    s.subjectId === val &&
+                                    s.classId === clsId &&
+                                    s.status !== ScheduleStatus.OFF &&
+                                    (editItem ? s.id !== editItem.id : true)
+                                ).reduce((acc, curr) => acc + curr.periodCount, 0);
+
+                                const remaining = Math.max(0, subject.totalPeriods - used);
+                                
+                                // Calculate max periods allowed based on start period (morning/afternoon boundary)
+                                const currentStart = editItem ? editItem.startPeriod : formStartPeriod;
+                                const maxSession = currentStart <= 5 ? 6 - currentStart : 11 - currentStart;
+
+                                let suggested = 3; // Default batch
+                                if (remaining < suggested) suggested = remaining; // Last session case
+                                
+                                suggested = Math.min(suggested, maxSession);
+                                if (remaining > 0) suggested = Math.max(1, suggested);
+                                
+                                if (editItem) {
+                                    setEditItem(prev => prev ? ({ ...prev, subjectId: val, teacherId: autoTeacherId, periodCount: suggested }) : null);
+                                } else {
+                                    setFormSubjectId(val);
+                                    setFormTeacherId(autoTeacherId);
+                                    setFormPeriodCount(suggested);
+                                }
+                                return;
+                            }
                         }
                 
                         if (editItem) {
