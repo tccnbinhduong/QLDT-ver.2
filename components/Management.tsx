@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useMemo } from 'react';
 import { useApp } from '../store/AppContext';
 import { Teacher, Subject, ClassEntity } from '../types';
@@ -174,8 +175,10 @@ const Management: React.FC = () => {
 
   const handleSaveSubject = () => {
     const selectedMajor = newSubject.majorId || filterMajorId;
+    const isCulture8 = selectedMajor === 'culture_8';
 
-    if (newSubject.name && newSubject.totalPeriods && selectedMajor) {
+    // Validation: Total periods not required for 'culture_8'
+    if (newSubject.name && (newSubject.totalPeriods || isCulture8) && selectedMajor) {
        const subjectData: any = {
            name: newSubject.name,
            majorId: selectedMajor,
@@ -568,8 +571,17 @@ const Management: React.FC = () => {
                     </select>
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Tổng số tiết</label>
-                    <input type="number" className="border p-2 rounded w-full" value={newSubject.totalPeriods || ''} onChange={e => setNewSubject({...newSubject, totalPeriods: Number(e.target.value)})} placeholder="0" />
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Tổng số tiết {(newSubject.majorId === 'culture_8' || filterMajorId === 'culture_8') && <span className="text-xs text-gray-400 font-normal">(Không bắt buộc)</span>}
+                    </label>
+                    <input 
+                        type="number" 
+                        className="border p-2 rounded w-full disabled:bg-gray-100 disabled:text-gray-500" 
+                        value={newSubject.totalPeriods || ''} 
+                        onChange={e => setNewSubject({...newSubject, totalPeriods: Number(e.target.value)})} 
+                        placeholder={(newSubject.majorId === 'culture_8' || filterMajorId === 'culture_8') ? "---" : "0"} 
+                        disabled={(newSubject.majorId === 'culture_8' || filterMajorId === 'culture_8')}
+                    />
                   </div>
                    <div className="md:col-span-3 pb-2">
                     <label className="flex items-center space-x-2 cursor-pointer select-none">

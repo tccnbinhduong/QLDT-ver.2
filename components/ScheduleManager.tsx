@@ -109,6 +109,9 @@ const ScheduleManager: React.FC = () => {
             isEligible = true;
         } else if (s.majorId === 'culture') {
             isEligible = !isH8;
+        } else if (s.majorId === 'culture_8') {
+            // NEW: Only eligible if class has 'H8' in name
+            isEligible = isH8;
         } else {
             isEligible = s.majorId === currentClass.majorId;
         }
@@ -149,7 +152,8 @@ const ScheduleManager: React.FC = () => {
              return true;
         } else {
              // For Class: Hide if subject is Finished
-             if (isFinished) return false;
+             // EXCEPTION: culture_8 subjects are never hidden based on progress
+             if (isFinished && s.majorId !== 'culture_8') return false;
              return true;
         }
     });
@@ -231,9 +235,8 @@ const ScheduleManager: React.FC = () => {
       if (!currentFormSubject) return false;
       if (currentFormSubject.isShared) return true;
       
-      // Check if it is a specific major (not common/culture)
-      // And if there are other classes with the same major
-      if (currentFormSubject.majorId !== 'common' && currentFormSubject.majorId !== 'culture') {
+      // Check if it is a specific major (not common/culture/culture_8)
+      if (currentFormSubject.majorId !== 'common' && currentFormSubject.majorId !== 'culture' && currentFormSubject.majorId !== 'culture_8') {
           return classes.some(c => c.id !== selectedClassId && c.majorId === currentFormSubject.majorId);
       }
       
@@ -262,6 +265,11 @@ const ScheduleManager: React.FC = () => {
 
           if (currentFormSubject.majorId === 'culture') {
               return !cls.name.toUpperCase().includes('H8');
+          }
+
+          // NEW: Culture 8 -> Only H8
+          if (currentFormSubject.majorId === 'culture_8') {
+              return cls.name.toUpperCase().includes('H8');
           }
           
           if (currentFormSubject.majorId !== 'common') {
@@ -306,7 +314,7 @@ const ScheduleManager: React.FC = () => {
   const getRelatedSharedItems = (sourceItem: ScheduleItem) => {
     const subject = subjects.find(s => s.id === sourceItem.subjectId);
     // Modified: Check implicit shared based on logic
-    const isShared = subject?.isShared || (subject && subject.majorId !== 'common' && subject.majorId !== 'culture');
+    const isShared = subject?.isShared || (subject && subject.majorId !== 'common' && subject.majorId !== 'culture' && subject.majorId !== 'culture_8');
     
     if (!isShared) return [sourceItem];
     return schedules.filter(s => 
@@ -609,7 +617,7 @@ const ScheduleManager: React.FC = () => {
       let itemsToProcess = [item];
 
       // Logic updated: use the same check as getRelatedSharedItems
-      const isShared = subject.isShared || (subject.majorId !== 'common' && subject.majorId !== 'culture');
+      const isShared = subject.isShared || (subject.majorId !== 'common' && subject.majorId !== 'culture' && subject.majorId !== 'culture_8');
 
       if (isShared) {
           if (processedSharedKeys.has(slotKey)) return; 
@@ -765,13 +773,25 @@ const ScheduleManager: React.FC = () => {
                 const seqInfo = getSessionSequenceInfo(item, schedules, subj?.totalPeriods);
                 const displayCumulative = Math.min(seqInfo.cumulative, subj?.totalPeriods || seqInfo.cumulative);
 
+                const isCulture8 = subj?.majorId === 'culture_8';
+                // Robust SHCN check: Remove spaces, Case Insensitive
+                const isSHCN = subj?.name?.trim().toUpperCase() === 'SHCN';
+
                 let cellText = `${subj?.name}`;
                 if (item.status === ScheduleStatus.OFF) cellText += ` (NGHỈ)`;
                 else if (item.type === 'exam') cellText = `THI: ${subj?.name}`;
                 if (item.group) cellText += `\n(${item.group})`; 
 
-                cellText += `\nGV: ${tea?.name || '---'}`;
-                cellText += `\nPhòng: ${item.roomId} | Tiết: ${displayCumulative}/${subj?.totalPeriods}`;
+                if (isSHCN) {
+                    // Only Subject Name. Do not append Teacher, Room, or Progress.
+                } else if (isCulture8) {
+                    // Only Subject Name + Teacher. Do not append Room or Progress.
+                    cellText += `\nGV: ${tea?.name || '---'}`;
+                } else {
+                    // Standard: Name + Teacher + Room + Progress
+                    cellText += `\nGV: ${tea?.name || '---'}`;
+                    cellText += `\nPhòng: ${item.roomId} | Tiết: ${displayCumulative}/${subj?.totalPeriods}`;
+                }
                 
                 cell.value = cellText;
                 cell.font = { name: 'Arial', size: 10, bold: true };
@@ -1235,9 +1255,9 @@ const ScheduleManager: React.FC = () => {
                         }
 
                         // NEW: Calculate remaining periods to auto-adjust for the last session
-                        if (val && !isExam) {
-                            const subject = subjects.find(s => s.id === val);
-                            if (subject) {
+                        // Skip if Culture 8 (allow unlimited scheduling)
+                        if (val && !isExam && selectedSub?.majorId !== 'culture_8') {
+                            if (selectedSub) {
                                 const used = schedules.filter(s =>
                                     s.subjectId === val &&
                                     s.classId === clsId &&
@@ -1245,7 +1265,7 @@ const ScheduleManager: React.FC = () => {
                                     (editItem ? s.id !== editItem.id : true)
                                 ).reduce((acc, curr) => acc + curr.periodCount, 0);
 
-                                const remaining = Math.max(0, subject.totalPeriods - used);
+                                const remaining = Math.max(0, selectedSub.totalPeriods - used);
                                 
                                 // Calculate max periods allowed based on start period (morning/afternoon boundary)
                                 const currentStart = editItem ? editItem.startPeriod : formStartPeriod;
@@ -1296,13 +1316,18 @@ const ScheduleManager: React.FC = () => {
                             if (currentFormSubject.majorId === 'culture') {
                                 return !cls.name.toUpperCase().includes('H8');
                             }
+
+                             // 2. Culture 8: Only H8
+                            if (currentFormSubject.majorId === 'culture_8') {
+                                return cls.name.toUpperCase().includes('H8');
+                            }
                             
-                            // 2. Common: Include All
+                            // 3. Common: Include All
                             if (currentFormSubject.majorId === 'common') {
                                 return true;
                             }
 
-                            // 3. Specific Major: Only include classes with same major
+                            // 4. Specific Major: Only include classes with same major
                             return cls.majorId === currentFormSubject.majorId;
                         }).map(cls => (
                             <label key={cls.id} className={`flex items-center space-x-2 text-sm p-2 rounded cursor-pointer ${selectedSharedClasses.includes(cls.id) ? 'bg-blue-100' : 'hover:bg-white'}`}>
@@ -1372,7 +1397,8 @@ const ScheduleManager: React.FC = () => {
 
                             if (type === 'class' && subjId) {
                                 const subject = subjects.find(s => s.id === subjId);
-                                if (subject) {
+                                // Skip limiting for culture_8
+                                if (subject && subject.majorId !== 'culture_8') {
                                     const used = schedules.filter(s =>
                                         s.subjectId === subjId &&
                                         s.classId === selectedClassId &&

@@ -116,10 +116,11 @@ const TeachingProgress: React.FC = () => {
     const isH8 = currentClass.name.toUpperCase().includes('H8');
 
     // 1. Filter relevant subjects
-    // Includes: Major specific, Common, and Culture (unless H8)
+    // Includes: Major specific, Common, Culture (unless H8), and Culture 8 (if H8)
     const classSubjects = subjects.filter(s => {
         if (s.majorId === 'common') return true;
         if (s.majorId === 'culture') return !isH8;
+        if (s.majorId === 'culture_8') return isH8; // H8 classes get Culture 8
         return s.majorId === currentClass.majorId;
     });
 
@@ -141,7 +142,49 @@ const TeachingProgress: React.FC = () => {
       
       const examSchedule = relevantSchedules.find(s => s.type === 'exam');
 
-      // --- GROUP LOGIC ---
+      // --- DATE CALCULATION (Prioritize Metadata) ---
+      let startDate = '--/--/----';
+      let endDate = '--/--/----';
+      let examDate = 'Chưa xếp';
+
+      // Start Date
+      if (metadata.customStartDate) {
+          startDate = format(parseLocal(metadata.customStartDate), 'dd/MM/yyyy');
+      } else if (classSchedules.length > 0) {
+          startDate = format(parseLocal(classSchedules[0].date), 'dd/MM/yyyy');
+      }
+
+      // End Date
+      if (metadata.customEndDate) {
+          endDate = format(parseLocal(metadata.customEndDate), 'dd/MM/yyyy');
+      } else if (classSchedules.length > 0) {
+          endDate = format(parseLocal(classSchedules[classSchedules.length - 1].date), 'dd/MM/yyyy');
+      }
+
+      // Exam Date
+      if (metadata.customExamDate) {
+           examDate = format(parseLocal(metadata.customExamDate), 'dd/MM/yyyy');
+      } else if (examSchedule) {
+           examDate = format(parseLocal(examSchedule.date), 'dd/MM/yyyy');
+      }
+
+      // --- CULTURE 8 EXCEPTION ---
+      // For 'culture_8' subjects, we do NOT calculate progress and force status to 'upcoming'
+      if (sub.majorId === 'culture_8') {
+          return {
+              ...sub,
+              learnedPeriods: 0,
+              groupBreakdown: [],
+              percentage: 0,
+              status: 'upcoming', // Always Upcoming/Sắp học
+              startDate,
+              endDate,
+              examDate,
+              isCustomized: false
+          };
+      }
+
+      // --- GROUP LOGIC (Standard) ---
       // Identify distinct groups (e.g. "Nhóm 1", "Nhóm 2")
       const uniqueGroups = Array.from(new Set(classSchedules.map(s => s.group).filter((g): g is string => !!g && g !== ''))) as string[];
       
@@ -187,33 +230,6 @@ const TeachingProgress: React.FC = () => {
 
       const totalPeriods = sub.totalPeriods;
       const percentage = Math.min(100, Math.round((totalLearnedForStandard / totalPeriods) * 100));
-
-
-      // --- DATE CALCULATION (Prioritize Metadata) ---
-      let startDate = '--/--/----';
-      let endDate = '--/--/----';
-      let examDate = 'Chưa xếp';
-
-      // Start Date
-      if (metadata.customStartDate) {
-          startDate = format(parseLocal(metadata.customStartDate), 'dd/MM/yyyy');
-      } else if (classSchedules.length > 0) {
-          startDate = format(parseLocal(classSchedules[0].date), 'dd/MM/yyyy');
-      }
-
-      // End Date
-      if (metadata.customEndDate) {
-          endDate = format(parseLocal(metadata.customEndDate), 'dd/MM/yyyy');
-      } else if (classSchedules.length > 0) {
-          endDate = format(parseLocal(classSchedules[classSchedules.length - 1].date), 'dd/MM/yyyy');
-      }
-
-      // Exam Date
-      if (metadata.customExamDate) {
-           examDate = format(parseLocal(metadata.customExamDate), 'dd/MM/yyyy');
-      } else if (examSchedule) {
-           examDate = format(parseLocal(examSchedule.date), 'dd/MM/yyyy');
-      }
 
       // --- STATUS CALCULATION ---
       const hasScheduleToday = relevantSchedules.some(s => isSameDay(parseLocal(s.date), today));

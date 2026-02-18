@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Teacher, Subject, ClassEntity, ScheduleItem, Major, ScheduleStatus, Student, AppState, DocumentItem, ExportTemplate, Holiday } from '../types';
 import { generateId } from '../utils';
@@ -66,6 +67,7 @@ const INITIAL_DATA: AppState = {
   majors: [
     { id: 'common', name: 'Môn chung' },
     { id: 'culture', name: 'Văn hóa' },
+    { id: 'culture_8', name: 'Văn hóa 8 môn' }, // Added new major category
     { id: '1', name: 'Kế toán Doanh nghiệp' },
     { id: '2', name: 'Điện công nghiệp' },
     { id: '3', name: 'Điện - điện tử' },

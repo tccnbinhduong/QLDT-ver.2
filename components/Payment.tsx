@@ -30,10 +30,11 @@ const Payment: React.FC = () => {
     classes.forEach(cls => {
         const isH8 = cls.name.toUpperCase().includes('H8');
 
-        // Subjects for this class: Major specific OR Common OR Culture (if not H8)
+        // Subjects for this class: Major specific OR Common OR Culture (if not H8) OR Culture 8 (if H8)
         const classSubjects = subjects.filter(s => {
             if (s.majorId === 'common') return true;
             if (s.majorId === 'culture') return !isH8;
+            if (s.majorId === 'culture_8') return isH8;
             return s.majorId === cls.majorId;
         });
         

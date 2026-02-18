@@ -18,9 +18,6 @@ const Statistics: React.FC = () => {
     const missedMap: Record<string, ScheduleItem[]> = {};
     const makeupMap: Record<string, number> = {};
     
-    // Use simple check or global helper. Using global helper is better.
-    // However, global helper requires iterating.
-    
     // Group items
     schedules.forEach(s => {
         const key = `${s.subjectId}-${s.classId}`;
@@ -60,21 +57,48 @@ const Statistics: React.FC = () => {
     return results;
   }, [schedules, subjects]);
 
-  // 2. Teacher Stats
-  const teacherStats = teachers.map(t => {
-    // Logic: Count classes OR (Exams marked as 'thực hành')
-    const taught = schedules.filter(s => 
-        s.teacherId === t.id && 
-        (s.status === ScheduleStatus.COMPLETED || s.status === ScheduleStatus.ONGOING || s.status === ScheduleStatus.PENDING) &&
-        (s.type === 'class' || (s.type === 'exam' && s.note?.toLowerCase().includes('thực hành')))
-    ); 
-    const totalPeriods = taught.reduce((acc, curr) => acc + curr.periodCount, 0);
-    return {
-      name: t.name,
-      periods: totalPeriods,
-      income: totalPeriods * t.ratePerPeriod
-    };
-  }).filter(t => t.periods > 0); 
+  // 2. Teacher Stats (Memoized)
+  const teacherStats = useMemo(() => {
+      return teachers.map(t => {
+        // Base filter: Get all valid teaching schedules for this teacher
+        // Exclude OFF sessions
+        // Include 'class' type OR 'exam' type if it's 'thực hành'
+        const allSchedules = schedules.filter(s => 
+            s.teacherId === t.id && 
+            s.status !== ScheduleStatus.OFF &&
+            (s.type === 'class' || (s.type === 'exam' && s.note?.toLowerCase().includes('thực hành')))
+        ); 
+
+        // Metric 1: Active Load (For Chart)
+        // Sum of periods for subjects that are NOT YET FINISHED.
+        const activeLoad = allSchedules.reduce((acc, s) => {
+            const sub = subjects.find(sub => sub.id === s.subjectId);
+            // If subject exists and is NOT finished, count it towards active load
+            if (sub && !isSubjectFinished(sub, s.classId, schedules)) {
+                return acc + s.periodCount;
+            }
+            return acc;
+        }, 0);
+
+        // Metric 2: Taught Load (For Excel / History)
+        // Sum of periods that are explicitly marked as COMPLETED (actually taught).
+        const taughtLoad = allSchedules.reduce((acc, s) => {
+            if (s.status === ScheduleStatus.COMPLETED) {
+                return acc + s.periodCount;
+            }
+            return acc;
+        }, 0);
+
+        return {
+          name: t.name,
+          activePeriods: activeLoad,
+          taughtPeriods: taughtLoad
+        };
+      });
+  }, [teachers, schedules, subjects]);
+
+  // Filter for Chart: Only show teachers currently teaching active subjects
+  const chartData = teacherStats.filter(t => t.activePeriods > 0);
 
   // 3. Subject Progress (All active subjects across all classes)
   const subjectStats = useMemo(() => {
@@ -83,10 +107,11 @@ const Statistics: React.FC = () => {
     classes.forEach(cls => {
         const isH8 = cls.name.toUpperCase().includes('H8');
         
-        // Subjects for this class: Major specific OR Common OR Culture (if not H8)
+        // Subjects for this class: Major specific OR Common OR Culture (if not H8) OR Culture 8 (if H8)
         const classSubjects = subjects.filter(s => {
             if (s.majorId === 'common') return true;
             if (s.majorId === 'culture') return !isH8;
+            if (s.majorId === 'culture_8') return isH8;
             return s.majorId === cls.majorId;
         });
         
@@ -120,22 +145,21 @@ const Statistics: React.FC = () => {
   }, [subjects, schedules, classes]);
 
   const exportTeacherReport = () => {
-     const data = schedules
-        .filter(s => s.status === ScheduleStatus.COMPLETED || s.status === ScheduleStatus.ONGOING)
-        .map(s => ({
-            'Ngày dạy': format(parseLocal(s.date), 'dd/MM/yyyy'),
-            'Giáo viên': teachers.find(t => t.id === s.teacherId)?.name,
-            'Môn học': subjects.find(sub => sub.id === s.subjectId)?.name,
-            'Loại': s.type === 'exam' ? 'Thi' : 'Học',
-            'Ghi chú': s.note || '',
-            'Số tiết': s.periodCount,
-            'Lớp': classes.find(c => c.id === s.classId)?.name || s.classId
-        }));
+     // Prepare data for all teachers (even those with 0 active periods)
+     const data = teacherStats.map(t => ({
+         'Họ và tên': t.name,
+         'Số tiết đang dạy (Môn chưa kết thúc)': t.activePeriods,
+         'Số tiết đã dạy (Thực tế đã hoàn thành)': t.taughtPeriods,
+     }));
     
     const ws = XLSX.utils.json_to_sheet(data);
+    
+    // Set column widths
+    ws['!cols'] = [{ wch: 25 }, { wch: 35 }, { wch: 35 }];
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "ThongKeGiangDay");
-    XLSX.writeFile(wb, "Thong_Ke_Giang_Vien.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, "ThongKeGiaoVien");
+    XLSX.writeFile(wb, "Thong_Ke_Tiet_Day_Giao_Vien.xlsx");
   };
 
   // Dynamic height calculation
@@ -173,27 +197,30 @@ const Statistics: React.FC = () => {
         {/* Teacher Chart */}
         <div className="bg-white p-6 rounded-xl shadow border h-[500px] flex flex-col">
            <div className="flex justify-between items-center mb-4 flex-shrink-0">
-              <h3 className="font-bold text-gray-700">Số tiết dạy theo Giáo viên</h3>
-              <button onClick={exportTeacherReport} className="text-sm bg-green-100 text-green-700 px-2 py-1 rounded flex items-center hover:bg-green-200">
-                <Download size={14} className="mr-1"/> Xuất Excel
+              <h3 className="font-bold text-gray-700">Số tiết đang dạy (Môn chưa kết thúc)</h3>
+              <button onClick={exportTeacherReport} className="text-sm bg-green-100 text-green-700 px-3 py-1.5 rounded flex items-center hover:bg-green-200 transition-colors font-medium">
+                <Download size={14} className="mr-1"/> Xuất Thống Kê Tổng
               </button>
            </div>
-           <p className="text-xs text-gray-500 mb-2 italic">* Chỉ tính các tiết học và các buổi thi được đánh dấu là "thực hành".</p>
-           {teacherStats.length > 0 ? (
+           <p className="text-xs text-gray-500 mb-2 italic">
+               * Biểu đồ chỉ hiển thị tải công việc hiện tại (các môn chưa kết thúc). <br/>
+               * Nhấn "Xuất Thống Kê Tổng" để xem cả số tiết đã dạy (lịch sử) của toàn bộ giáo viên.
+           </p>
+           {chartData.length > 0 ? (
              <div className="flex-1 min-h-0">
                <ResponsiveContainer width="100%" height="100%">
-                 <BarChart data={teacherStats}>
+                 <BarChart data={chartData}>
                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
                    <XAxis dataKey="name" tick={{fontSize: 11}} interval={0} angle={-15} textAnchor="end" height={60} />
                    <YAxis />
-                   <Tooltip />
-                   <Bar dataKey="periods" fill="#3B82F6" name="Số tiết" barSize={40} />
+                   <Tooltip cursor={{fill: '#f3f4f6'}} />
+                   <Bar dataKey="activePeriods" fill="#3B82F6" name="Số tiết đang dạy" barSize={40} />
                  </BarChart>
                </ResponsiveContainer>
              </div>
            ) : (
              <div className="flex-1 flex items-center justify-center text-gray-400 italic">
-               Chưa có dữ liệu giáo viên đang dạy.
+               Không có giáo viên nào đang dạy môn chưa kết thúc.
              </div>
            )}
         </div>

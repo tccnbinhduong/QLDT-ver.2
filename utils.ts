@@ -225,6 +225,9 @@ export const isSubjectFinished = (
   classId: string,
   schedules: ScheduleItem[]
 ): boolean => {
+    // Cultural 8 subjects are never considered "finished" for payment/stats purposes automatically
+    if (subject.majorId === 'culture_8') return false;
+
     const uniqueKey = `${subject.id}-${classId}`;
     
     // 1. Metadata (Teaching Progress Override)
