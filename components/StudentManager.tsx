@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import { useApp } from '../store/AppContext';
 import { Student } from '../types';
 import { Plus, Trash2, Edit2, Upload, Save, X, Filter, User, HelpCircle, FileSpreadsheet, ArrowUpDown, ArrowUp, ArrowDown, Search } from 'lucide-react';
-import XLSX from 'xlsx';
+import *as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import saveAs from 'file-saver';
 import { format } from 'date-fns';
